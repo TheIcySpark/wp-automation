@@ -132,4 +132,4 @@ export default function App() {
     </ChakraProvider>
   )
 }
-{/* <ColorModeSwitcher justifySelf="flex-end" /> */ }
+/* <ColorModeSwitcher justifySelf="flex-end" /> */

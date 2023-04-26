@@ -1,6 +1,6 @@
-import { AlertDialog, AlertDialogBody, AlertDialogContent, AlertDialogFooter, AlertDialogHeader, AlertDialogOverlay, Button, Center, Flex, Grid, GridItem, HStack, IconButton, Input, InputGroup, InputRightElement, Spacer, Tag, Text, VStack, useDisclosure, useToast } from "@chakra-ui/react";
+import { AlertDialog, AlertDialogBody, AlertDialogContent, AlertDialogFooter, AlertDialogHeader, AlertDialogOverlay, Button, Center, Flex, Grid, GridItem, HStack, IconButton, Input, InputGroup, InputRightElement, Spacer, Tag, VStack, useDisclosure, useToast } from "@chakra-ui/react";
 import UserDataForm from "./UserDataForm";
-import { getDatabase, ref, onValue, remove, off, get, child, set } from "firebase/database";
+import { getDatabase, ref, onValue, remove, off, get, child } from "firebase/database";
 import React from "react";
 import { useEffect } from 'react';
 import IUserDataForm from "./IUserDataForm";
@@ -12,12 +12,12 @@ interface IProps {
 
 export default function UserLayout(props: IProps) {
   const [userData, setUserData] = React.useState<IUserDataForm>({ name: '', number: undefined, checkListOptions: [], messages: [] });
-  const [newUserData, setNewUserData] = React.useState<IUserDataForm>({ name: '', number: undefined, checkListOptions: [], messages: new Array(0) });
+  const [newUserData, setNewUserData] = React.useState<IUserDataForm>({ name: '', number: undefined, checkListOptions: [], messages: [] });
   const [messageDate, setMessageDate] = React.useState('');
   const [customMessage, setCustomMessage] = React.useState('');
   const [usersFromDatabase, setUsersFromDatabase] = React.useState<IUserDataForm[]>([]);
   const [filteredUsersFromDatabase, setFilteredUsersFromDatabase] = React.useState<IUserDataForm[]>([]);
-  const [selectedUser, setSelectedUser] = React.useState(-1);
+  const [selectedUser, setSelectedUser] = React.useState<IUserDataForm>();
   const [currentFilter, setCurrentFilter] = React.useState('');
 
 
@@ -36,38 +36,30 @@ export default function UserLayout(props: IProps) {
         const sorted_array_data = array_data.sort((a, b) => a.name.localeCompare(b.name));
         setUsersFromDatabase(sorted_array_data);
         setFilteredUsersFromDatabase(sorted_array_data.filter((user) => user.name.toLowerCase().includes(currentFilter.toLowerCase())));
-      } else {
-        setUsersFromDatabase([])
+        if (selectedUser) {
+          setSelectedUser(sorted_array_data.find((user) => user.number === selectedUser?.number));
+        }
       }
     })
     return () => {
       off(databaseRef);
     }
-  },);
-
-  useEffect(() => {
-    const database = getDatabase();
-    const databaseRef = ref(database);
-    get(child(databaseRef, 'users')).then((snapshot) => {
-      if (snapshot.exists()) {
-        const data = snapshot.val();
-        const array_data = Object.keys(data).map((key) => data[key]);
-        const sorted_array_data = array_data.sort((a, b) => a.name.localeCompare(b.name));
-        setFilteredUsersFromDatabase(sorted_array_data);
-      }
-    })
-  }, [])
+  }, [currentFilter, selectedUser]);
 
 
   function selectUser(index: number) {
-    setSelectedUser(-1);
+    setSelectedUser(undefined);
     setTimeout(() => {
-      setSelectedUser(index);
+      setSelectedUser(filteredUsersFromDatabase[index]);
       setUserData(filteredUsersFromDatabase[index]);
-      setNewUserData(filteredUsersFromDatabase[index]);
+      if (!filteredUsersFromDatabase[index].messages) {
+        setNewUserData({ ...filteredUsersFromDatabase[index], messages: [] });
+      } else {
+        setNewUserData({...filteredUsersFromDatabase[index]});
+      }
       setMessageDate('');
       setCustomMessage('');
-    }, 1);
+    }, 1)
   }
 
   function deleteUser(userNumber: number) {
@@ -97,7 +89,6 @@ export default function UserLayout(props: IProps) {
 
   function filterUsers(e: React.ChangeEvent<HTMLInputElement>) {
     setCurrentFilter(e.target.value);
-    setFilteredUsersFromDatabase(usersFromDatabase.filter((user) => user.name.toLowerCase().includes(e.target.value.toLowerCase())));
   }
 
   function handleDateInputChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -158,7 +149,7 @@ export default function UserLayout(props: IProps) {
                 fetch('https://graph.facebook.com/v16.0/100708719680927/messages', {
                   method: 'POST',
                   headers: {
-                    'Authorization': 'Bearer EAARdq91aglsBAK36SeIGqtrNZBURrUZCv8jV7HxiP6BuzlwSoZCJQXugz6CG2YZCgUZBCp1d3RNZBq4rbBRVASDzDlZANZCIJ1PnPQpb3gntfLYGrNuDqGkBFsNneVZAsk6g4qjJ1BcJQOZCZBifqFQ0UNPy0QZAnZAsy8sZBTvnEZAMrNqI5up7f7tzyc9BuoYKZAd1AihnZCgmy2UWuK0qfvmlgFfIY',
+                    'Authorization': 'Bearer EAARdq91aglsBAEfGZAAUGvhluVD2os5CtIFImdybId6aREA1nMu5hjuOlVoYQyHRLZCvtQB0mcWj0tW83EkyrYrO6QrKe00oqzfDxkiUh2lvlBCp4VV3NHLfCZBO4iT6BCinu8pA4oFuf0zCNFaFJ484EY3HT4dQgYVwhzKQ9FKt3uCszQdxj86VaL3vk4mt1GB0edBTevyMyUZB3v1h',
                     'Content-Type': 'application/json'
                   },
                   body: JSON.stringify({
@@ -239,7 +230,7 @@ export default function UserLayout(props: IProps) {
         })}
       </GridItem>
       <GridItem rowSpan={10} colSpan={2} overflowY={"auto"}>
-        {selectedUser !== -1 && usersFromDatabase.length >= 1 &&
+        {selectedUser && usersFromDatabase.length >= 1 &&
           <>
             <UserDataForm userData={newUserData} setUserData={setNewUserData} isNumberDisabled={true} key='currentUserData' />
             <Center>
@@ -280,7 +271,7 @@ export default function UserLayout(props: IProps) {
         }
       </GridItem>
       <GridItem rowSpan={10} colSpan={2} overflowY={"auto"}>
-        {selectedUser !== -1 && usersFromDatabase.length >= 1 &&
+        {selectedUser && usersFromDatabase.length >= 1 &&
           <VStack>
             <Input
               placeholder="Select Date and Time"
@@ -294,7 +285,7 @@ export default function UserLayout(props: IProps) {
             <Button colorScheme="cyan" w={'100%'} onClick={() => saveMessage(customMessage)}>
               Enviar mensaje personalizado
             </Button>
-            {filteredUsersFromDatabase[selectedUser].messages && filteredUsersFromDatabase[selectedUser].messages.map((message, index) => {
+            {selectedUser.messages !== undefined && selectedUser.messages.map((message, index) => {
               return (
                 <Flex key={index} w={'100%'}>
                   <Tag w={'70%'} colorScheme="green" variant={"outline"}>{message.split('&&')[0]}</Tag>
