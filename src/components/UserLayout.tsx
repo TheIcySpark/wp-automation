@@ -1,4 +1,4 @@
-import { AlertDialog, AlertDialogBody, AlertDialogContent, AlertDialogFooter, AlertDialogHeader, AlertDialogOverlay, Button, Center, Flex, Grid, GridItem, HStack, IconButton, Input, InputGroup, InputRightElement, Spacer, Tag, VStack, useDisclosure, useToast } from "@chakra-ui/react";
+import { AlertDialog, AlertDialogBody, AlertDialogContent, AlertDialogFooter, AlertDialogHeader, AlertDialogOverlay, Button, Center, Flex, Grid, GridItem, HStack, IconButton, Input, InputGroup, InputLeftAddon, InputRightAddon, InputRightElement, Spacer, Tag, Textarea, VStack, useDisclosure, useToast, Text, Divider } from '@chakra-ui/react';
 import UserDataForm from "./UserDataForm";
 import { getDatabase, ref, onValue, remove, off, get, child } from "firebase/database";
 import React from "react";
@@ -25,7 +25,6 @@ export default function UserLayout(props: IProps) {
   const { isOpen: isDeleteAlertOpen, onOpen: onDeleteAlertOpen, onClose: onDeleteAlertClose } = useDisclosure()
   const cancelAlertRef = React.useRef(null)
 
-
   useEffect(() => {
     const database = getDatabase();
     const databaseRef = ref(database, 'users');
@@ -36,15 +35,18 @@ export default function UserLayout(props: IProps) {
         const sorted_array_data = array_data.sort((a, b) => a.name.localeCompare(b.name));
         setUsersFromDatabase(sorted_array_data);
         setFilteredUsersFromDatabase(sorted_array_data.filter((user) => user.name.toLowerCase().includes(currentFilter.toLowerCase())));
-        if (selectedUser) {
-          setSelectedUser(sorted_array_data.find((user) => user.number === selectedUser?.number));
+        if (selectedUser !== undefined) {
+          const user = sorted_array_data.find((user) => user.number === selectedUser?.number);
+          setSelectedUser(user)
+          setUserData(user)
+          setNewUserData(user);
         }
       }
     })
     return () => {
       off(databaseRef);
     }
-  }, [currentFilter, selectedUser]);
+  }, []);
 
 
   function selectUser(index: number) {
@@ -55,11 +57,11 @@ export default function UserLayout(props: IProps) {
       if (!filteredUsersFromDatabase[index].messages) {
         setNewUserData({ ...filteredUsersFromDatabase[index], messages: [] });
       } else {
-        setNewUserData({...filteredUsersFromDatabase[index]});
+        setNewUserData({ ...filteredUsersFromDatabase[index] });
       }
       setMessageDate('');
       setCustomMessage('');
-    }, 1)
+    }, 1);
   }
 
   function deleteUser(userNumber: number) {
@@ -95,7 +97,7 @@ export default function UserLayout(props: IProps) {
     setMessageDate(e.target.value);
   }
 
-  function saveMessage(message: string) {
+  function saveMessage(userData: IUserDataForm, message: string) {
     if (messageDate === '') {
       toast({
         title: 'Error',
@@ -106,100 +108,18 @@ export default function UserLayout(props: IProps) {
       })
       return;
     }
-    if (!newUserData.messages) {
-      newUserData.messages = [];
+    let messages = userData.messages;
+    if (!messages) {
+      messages = [];
     }
-    newUserData.messages.push(message + '&&' + messageDate);
-    props.updateUser(newUserData);
+    messages.push(message + '&&' + messageDate);
+    const updatedUserdata = { ...userData, messages };
+    props.updateUser(updatedUserdata);
   }
 
-  function deleteMessage(index: number) {
-    newUserData.messages.splice(index, 1);
-    props.updateUser(newUserData);
-  }
-
-  function testFunction() {
-    const database = getDatabase();
-    const databaseRef = ref(database);
-    get(child(databaseRef, 'users')).then((snapshot) => {
-      if (snapshot.exists()) {
-        const data = snapshot.val();
-        const array_data = Object.keys(data).map((key) => data[key]);
-        for (let userIndex = 0; userIndex < array_data.length; userIndex++) {
-          if (array_data[userIndex].messages) {
-            for (let messageIndex = 0; messageIndex < array_data[userIndex].messages.length; messageIndex++) {
-              const date = new Date(array_data[userIndex].messages[messageIndex].split('&&')[1]);
-              if (date.getTime() < new Date().getTime()) {
-                let messageToSend = ''
-                let templateName = '';
-                if (array_data[userIndex].messages[messageIndex].split('&&')[0] === '<Automatico>') {
-                  templateName = 'automatic_message';
-                  array_data[userIndex].checkListOptions.forEach((checkListOption: { name: string, value: string }) => {
-                    if (checkListOption.value === 'negativo') {
-                      if (messageToSend) {
-                        messageToSend += ', '
-                      }
-                      messageToSend += checkListOption.name;
-                    }
-                  })
-                } else {
-                  templateName = 'remainder_message';
-                  messageToSend = customMessage;
-                }
-                fetch('https://graph.facebook.com/v16.0/100708719680927/messages', {
-                  method: 'POST',
-                  headers: {
-                    'Authorization': 'Bearer EAARdq91aglsBAEfGZAAUGvhluVD2os5CtIFImdybId6aREA1nMu5hjuOlVoYQyHRLZCvtQB0mcWj0tW83EkyrYrO6QrKe00oqzfDxkiUh2lvlBCp4VV3NHLfCZBO4iT6BCinu8pA4oFuf0zCNFaFJ484EY3HT4dQgYVwhzKQ9FKt3uCszQdxj86VaL3vk4mt1GB0edBTevyMyUZB3v1h',
-                    'Content-Type': 'application/json'
-                  },
-                  body: JSON.stringify({
-                    messaging_product: 'whatsapp',
-                    to: array_data[userIndex].number,
-                    type: 'template',
-                    template: {
-                      name: templateName,
-                      language: {
-                        code: 'es_AR'
-                      },
-                      components: [
-                        {
-                          type: 'body',
-                          parameters: [
-                            {
-                              type: 'text',
-                              text: messageToSend
-                            }
-                          ]
-                        }
-                      ]
-                    }
-                  })
-                })
-                  .then(response => response.json())
-                  .then(data => {
-                    toast({
-                      title: 'Enviado',
-                      description: "Mensaje programado correctamente",
-                      status: 'success',
-                      duration: 4000,
-                      isClosable: true
-                    })
-                  })
-                  .catch(error => {
-                    toast({
-                      title: 'Error',
-                      description: error.message,
-                      status: 'error',
-                      duration: 4000,
-                      isClosable: true
-                    })
-                  });
-              }
-            }
-          }
-        }
-      }
-    })
+  function deleteMessage(userData: IUserDataForm, index: number) {
+    userData.messages.splice(index, 1);
+    props.updateUser(userData);
   }
 
   return (
@@ -279,10 +199,12 @@ export default function UserLayout(props: IProps) {
               type="datetime-local"
               onChange={handleDateInputChange}
             />
-            <Button colorScheme="cyan" w={'100%'} onClick={() => saveMessage('<Automatico>')}>Enviar mensaje automatico</Button>
-            <Tag colorScheme="purple">Mensaje personalizado</Tag>
-            <Input type="txt" onChange={(e) => { setCustomMessage(e.target.value) }}></Input>
-            <Button colorScheme="cyan" w={'100%'} onClick={() => saveMessage(customMessage)}>
+            <Button colorScheme="cyan" w={'100%'} onClick={() => saveMessage(newUserData, '<Automatico>')}>Enviar mensaje automatico</Button>
+            <Divider />
+            <Text>Buen dia</Text>
+            <Textarea onChange={(e) => { setCustomMessage(e.target.value) }} />
+            <Text>. Estamos en contacto</Text>
+            <Button colorScheme="cyan" w={'100%'} onClick={() => saveMessage(newUserData, customMessage)}>
               Enviar mensaje personalizado
             </Button>
             {selectedUser.messages !== undefined && selectedUser.messages.map((message, index) => {
@@ -291,11 +213,10 @@ export default function UserLayout(props: IProps) {
                   <Tag w={'70%'} colorScheme="green" variant={"outline"}>{message.split('&&')[0]}</Tag>
                   <Tag w={'25%'} colorScheme="orange" variant={"outline"}>{message.split('&&')[1]}</Tag>
                   <Spacer />
-                  <IconButton colorScheme="red" aria-label={"delete message"} icon={<FaTrash />} onClick={() => deleteMessage(index)}></IconButton>
+                  <IconButton colorScheme="red" aria-label={"delete message"} icon={<FaTrash />} onClick={() => deleteMessage(newUserData, index)}></IconButton>
                 </Flex>
               )
             })}
-            <Button onClick={() => testFunction()}>Test</Button>
           </VStack>
         }
       </GridItem>

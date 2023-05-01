@@ -2,7 +2,6 @@ import { HStack, Input, Text } from "@chakra-ui/react"
 import * as React from "react"
 import ClientCheckListData from "./ClientCheckListData"
 import IUserDataForm from "./IUserDataForm"
-import { useEffect, useRef } from "react"
 
 interface IProps {
   userData: IUserDataForm

@@ -52,6 +52,9 @@ export default function App() {
   const toast = useToast()
 
   function saveUser(userData: IUserDataForm) {
+    if(!userData.messages){
+      userData.messages = []
+    }
     set(ref(database, 'users/' + userData.number), {
       name: userData.name,
       number: userData.number,
